@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invoice Generator</title>
+
+  <!-- html2pdf.js CDN for client-side PDF generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f6f9;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 750px;
+      background: #fff;
+      padding: 25px;
+      margin: 0 auto;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    h2, h3 {
+      color: #333;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 10px;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 16px; /* Prevents auto-zoom on iOS */
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 15px;
+    }
+
+    table th, table td {
+      padding: 8px;
+      border: 1px solid #ddd;
+    }
+
+    .payment-section {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 6px;
+      border: 1px solid #e9ecef;
+      margin-top: 20px;
+      margin-bottom: 20px;
+    }
+
+    .btn-primary {
+      background-color: #007bff;
+      color: white;
+      padding: 12px 15px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      width: 100%;
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    .btn-secondary {
+      background-color: #28a745;
+      color: white;
+      padding: 8px 14px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .btn-danger {
+      background-color: #dc3545;
+      color: white;
+      padding: 6px 10px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    /* Mobile Responsive Styles for Items Table */
+    @media screen and (max-width: 600px) {
+      #itemsTable, #itemsTable thead, #itemsTable tbody, #itemsTable th, #itemsTable td, #itemsTable tr {
+        display: block;
+      }
+
+      #itemsTable thead {
+        display: none; /* Hide header row on mobile */
+      }
+
+      #itemsTable tr {
+        margin-bottom: 15px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        padding: 10px;
+        background: #fafafa;
+      }
+
+      #itemsTable td {
+        border: none;
+        padding: 6px 0;
+        position: relative;
+      }
+
+      #itemsTable td::before {
+        content: attr(data-label);
+        font-weight: bold;
+        display: block;
+        margin-bottom: 4px;
+        font-size: 14px;
+        color: #555;
+      }
+    }
+
+    /* Off-screen PDF Wrapper */
+    #pdfWrapper {
+      position: absolute;
+      left: -9999px;
+      top: 0;
+      width: 750px;
+    }
+
+    .pdf-container {
+      padding: 30px;
+      background: #ffffff;
+      font-family: Arial, sans-serif;
+      color: #333;
+      box-sizing: border-box;
+    }
+
+    .pdf-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid #007bff;
+      padding-bottom: 15px;
+      margin-bottom: 20px;
+    }
+
+    .pdf-header h1 {
+      margin: 0;
+      color: #007bff;
+      font-size: 28px;
+    }
+
+    .pdf-company-name {
+      font-size: 20px;
+      font-weight: bold;
+      color: #333;
+      margin: 0 0 5px 0;
+    }
+
+    .pdf-details {
+      margin-bottom: 20px;
+    }
+
+    .pdf-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+
+    .pdf-table th {
+      background-color: #007bff;
+      color: white;
+      text-align: left;
+    }
+
+    .pdf-table th, .pdf-table td {
+      padding: 10px;
+      border: 1px solid #ddd;
+    }
+
+    .pdf-summary {
+      width: 280px;
+      margin-left: auto;
+    }
+
+    .pdf-summary table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .pdf-summary td {
+      padding: 6px 0;
+      border: none;
+    }
+
+    .pdf-summary tr.highlight {
+      border-top: 2px solid #333;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1><marquee>WELCOME TO KB INVOICE GENERATOR</marquee></h1>
+    <h2>Generate Customer Invoice</h2>
+    
+    <!-- Invoice Input Form -->
+    <form id="invoiceForm">
+      <h3>Business Details</h3>
+      <div class="form-group">
+        <label for="companyName">Your Company / Business Name:</label>
+        <input type="text" id="companyName" placeholder="e.g. My Business Ltd" required />
+      </div>
+
+      <div class="form-group">
+        <label for="currencySelect">Select Currency:</label>
+        <select id="currencySelect" onchange="calculateTotals()">
+          <option value="$">USD ($)</option>
+          <option value="GH₵">GHS (GH₵)</option>
+          <option value="€">EUR (€)</option>
+          <option value="£">GBP (£)</option>
+          <option value="₦">NGN (₦)</option>
+          <option value="CA$">CAD (CA$)</option>
+          <option value="A$">AUD (A$)</option>
+          <option value="₹">INR (₹)</option>
+        </select>
+      </div>
+
+      <h3>Customer Information</h3>
+      <div class="form-group">
+        <label for="clientName">Customer Name:</label>
+        <input type="text" id="clientName" required placeholder="John Doe" />
+      </div>
+      <div class="form-group">
+        <label for="clientEmail">Customer Email:</label>
+        <input type="email" id="clientEmail" placeholder="john@example.com" />
+      </div>
+      <div class="form-group">
+        <label for="invoiceDate">Invoice Date:</label>
+        <input type="date" id="invoiceDate" required />
+      </div>
+
+      <h3>Items</h3>
+      <table id="itemsTable">
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th>Qty</th>
+            <th>Price (<span class="curr-symbol">$</span>)</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="itemsList">
+          <tr>
+            <td data-label="Description"><input type="text" class="item-desc" required placeholder="Item description" /></td>
+            <td data-label="Quantity"><input type="number" class="item-qty" min="1" value="1" oninput="calculateTotals()" required /></td>
+            <td data-label="Price"><input type="number" class="item-price" step="0.01" min="0" value="0.00" oninput="calculateTotals()" required /></td>
+            <td data-label="Action"><button type="button" class="btn-danger" onclick="removeItem(this)">Remove</button></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <button type="button" class="btn-secondary" onclick="addItem()">+ Add Item</button>
+
+      <!-- Payment Breakdown Inputs -->
+      <div class="payment-section">
+        <h3>Payment Summary</h3>
+        <p><strong>Total Amount:</strong> <span class="curr-symbol">$</span><span id="displayTotal">0.00</span></p>
+        <div class="form-group">
+          <label for="amountPaid">Amount Paid (<span class="curr-symbol">$</span>):</label>
+          <input type="number" id="amountPaid" step="0.01" min="0" value="0.00" oninput="calculateTotals()" />
+        </div>
+        <p><strong>Balance:</strong> <span class="curr-symbol">$</span><span id="displayBalance">0.00</span></p>
+      </div>
+
+      <button type="button" class="btn-primary" onclick="generatePDF()">Download PDF Invoice</button>
+    </form>
+  </div>
+
+  <!-- Off-Screen Structure Prepared for Full PDF Rendering -->
+  <div id="pdfWrapper">
+    <div class="pdf-container" id="invoiceTemplate">
+      <div class="pdf-header">
+        <div>
+          <p class="pdf-company-name" id="pdfCompanyName"></p>
+          <h1>INVOICE</h1>
+        </div>
+        <div>
+          <p><strong>Date:</strong> <span id="pdfDate"></span></p>
+        </div>
+      </div>
+
+      <div class="pdf-details">
+        <h3>Billed To:</h3>
+        <p><strong id="pdfClientName"></strong></p>
+        <p id="pdfClientEmail"></p>
+      </div>
+
+      <table class="pdf-table">
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th>Qty</th>
+            <th>Unit Price (<span class="curr-symbol">$</span>)</th>
+            <th>Total (<span class="curr-symbol">$</span>)</th>
+          </tr>
+        </thead>
+        <tbody id="pdfItemsList"></tbody>
+      </table>
+
+      <!-- PDF Summary Section -->
+      <div class="pdf-summary">
+        <table>
+          <tr>
+            <td>Total Amount:</td>
+            <td style="text-align: right;"><span class="curr-symbol">$</span><span id="pdfTotalAmount">0.00</span></td>
+          </tr>
+          <tr>
+            <td>Amount Paid:</td>
+            <td style="text-align: right;"><span class="curr-symbol">$</span><span id="pdfAmountPaid">0.00</span></td>
+          </tr>
+          <tr class="highlight">
+            <td>Balance:</td>
+            <td style="text-align: right;"><span class="curr-symbol">$</span><span id="pdfBalance">0.00</span></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Set default date to today
+    document.getElementById('invoiceDate').valueAsDate = new Date();
+
+    // Add a new row to the table
+    function addItem() {
+      const tbody = document.getElementById("itemsList");
+      const row = document.createElement("tr");
+
+      row.innerHTML = `
+        <td data-label="Description"><input type="text" class="item-desc" required placeholder="Item description" /></td>
+        <td data-label="Quantity"><input type="number" class="item-qty" min="1" value="1" oninput="calculateTotals()" required /></td>
+        <td data-label="Price"><input type="number" class="item-price" step="0.01" min="0" value="0.00" oninput="calculateTotals()" required /></td>
+        <td data-label="Action"><button type="button" class="btn-danger" onclick="removeItem(this)">Remove</button></td>
+      `;
+
+      tbody.appendChild(row);
+      calculateTotals();
+    }
+
+    // Remove an item row
+    function removeItem(button) {
+      const tbody = document.getElementById("itemsList");
+      if (tbody.rows.length > 1) {
+        button.closest("tr").remove();
+        calculateTotals();
+      } else {
+        alert("Invoice must contain at least one item.");
+      }
+    }
+
+    // Update Currency Symbols and Calculate Totals
+    function calculateTotals() {
+      const selectedSymbol = document.getElementById("currencySelect").value;
+      const symbolElements = document.querySelectorAll(".curr-symbol");
+      symbolElements.forEach(el => el.innerText = selectedSymbol);
+
+      let totalAmount = 0;
+      const rows = document.querySelectorAll("#itemsList tr");
+
+      rows.forEach((row) => {
+        const qty = parseFloat(row.querySelector(".item-qty").value) || 0;
+        const price = parseFloat(row.querySelector(".item-price").value) || 0;
+        totalAmount += qty * price;
+      });
+
+      const amountPaid = parseFloat(document.getElementById("amountPaid").value) || 0;
+      
+      // Balance = Amount Paid - Total Amount
+      const balance = amountPaid - totalAmount;
+
+      document.getElementById("displayTotal").innerText = totalAmount.toFixed(2);
+      document.getElementById("displayBalance").innerText = balance.toFixed(2);
+
+      return { totalAmount, amountPaid, balance, selectedSymbol };
+    }
+
+    // Process inputs and download PDF
+    function generatePDF() {
+      const companyName = document.getElementById("companyName").value.trim();
+      const clientName = document.getElementById("clientName").value.trim();
+      const clientEmail = document.getElementById("clientEmail").value.trim();
+      const invoiceDate = document.getElementById("invoiceDate").value;
+
+      if (!companyName || !clientName || !invoiceDate) {
+        alert("Please fill in all required details (Company Name, Customer Name, Date).");
+        return;
+      }
+
+      const { totalAmount, amountPaid, balance, selectedSymbol } = calculateTotals();
+
+      // Populate PDF Template
+      document.getElementById("pdfCompanyName").innerText = companyName;
+      document.getElementById("pdfClientName").innerText = clientName;
+      document.getElementById("pdfClientEmail").innerText = clientEmail;
+      document.getElementById("pdfDate").innerText = invoiceDate;
+
+      const pdfItemsList = document.getElementById("pdfItemsList");
+      pdfItemsList.innerHTML = "";
+
+      const rows = document.querySelectorAll("#itemsList tr");
+      rows.forEach((row) => {
+        const desc = row.querySelector(".item-desc").value || "N/A";
+        const qty = parseFloat(row.querySelector(".item-qty").value) || 0;
+        const price = parseFloat(row.querySelector(".item-price").value) || 0;
+        const total = qty * price;
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${desc}</td>
+          <td>${qty}</td>
+          <td>${selectedSymbol}${price.toFixed(2)}</td>
+          <td>${selectedSymbol}${total.toFixed(2)}</td>
+        `;
+        pdfItemsList.appendChild(tr);
+      });
+
+      // Update PDF Summary
+      document.getElementById("pdfTotalAmount").innerText = totalAmount.toFixed(2);
+      document.getElementById("pdfAmountPaid").innerText = amountPaid.toFixed(2);
+      document.getElementById("pdfBalance").innerText = balance.toFixed(2);
+
+      // Target the PDF template element
+      const element = document.getElementById("invoiceTemplate");
+
+      // Configure export options for optimal quality
+      const opt = {
+        margin: [0.4, 0.4, 0.4, 0.4],
+        filename: `Invoice_${clientName.replace(/\s+/g, '_')}.pdf`,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { 
+          scale: 2, 
+          useCORS: true, 
+          scrollX: 0, 
+          scrollY: 0 
+        },
+        jsPDF: { unit: "in", format: "letter", orientation: "portrait" }
+      };
+
+      // Export as PDF
+      html2pdf().set(opt).from(element).save();
+    }
+
+    // Initialize totals and currency symbol on page load
+    calculateTotals();
+  </script>
+</body>
+</html>
